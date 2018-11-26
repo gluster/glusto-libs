@@ -119,10 +119,10 @@ class RestClient(object):
                                 headers=headers, verify=self.verify)
 
         if resp.status_code != expected_status_code:
-            return (resp.status_code, None, json.dumps(resp.json()))
+            return (1, None, json.dumps(resp.json()))
 
         if resp.status_code == 204:
-            return resp.status_code, {}
+            return (resp.status_code, None, None)
 
-        return (resp.status_code, json.dumps(resp.json()), None)
+        return (0, json.dumps(resp.json()), None)
 
