@@ -23,9 +23,44 @@ import random
 import copy
 import datetime
 import socket
+from uuid import UUID
 from glusto.core import Glusto as g
 from glustolibs.gluster.mount_ops import create_mount_objs
-from glustolibs.gluster.expections import ConfigError
+from glustolibs.gluster.expections import (
+        ConfigError, GlusterApiInvalidInputs)
+
+
+def validate_uuid(brick_id, version=4):
+    """
+    Validates the uuid
+    Args:
+       brick_id (str) : Brick_id to be validated
+       version (int)
+    Returns:
+       True (bool) on if the uuid is valid hex code,
+       else false
+    """
+    try:
+        UUID(brick_id, version=version)
+    except ValueError:
+        # If it's a value error, then the string
+        # is not a valid hex code for a UUID.
+        g.log.error("Invalid brick_id %s", brick_id)
+        return False
+    return True
+
+
+def validate_peer_id(peerid):
+    """
+    Validates the peer id
+    Args:
+        peer id (str) : peer id to be validated
+    Returns:
+        Exceptions on failure
+    """
+    if not validate_uuid(peerid):
+        g.log.error("Invalid peer id %s speceified", peerid)
+        raise GlusterApiInvalidInputs("Invalid peer id specified")
 
 
 def inject_msg_in_logs(nodes, log_msg, list_of_dirs=None, list_of_files=None):
