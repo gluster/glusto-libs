@@ -69,8 +69,8 @@ To install glusto-tests dependencies:
 
 - To install run:
 
-	# easy_install pip
-	# pip install --pre python-docx
+	*# easy_install pip
+        # pip install --pre python-docx*
 
 How to run the test case:
 -------------------------
@@ -84,48 +84,48 @@ How to run the test case:
     the glusto framework. The various options to run tests as provided by
     glusto framework:
 
-    To run PyTest tests:
+    - To run PyTest tests:
 
-        - To run all tests that are marked with tag 'bvt'.
+        - To run all tests that are marked with tag 'bvt':
+             *# glusto -c config.yml --pytest='-v -x tests -m bvt'*
 
-        `# glusto -c config.yml --pytest='-v -x tests -m bvt'`
+        - To run all tests that are under bvt folder:
+             *# glusto -c config.yml --pytest='-v -s bvt/'*
 
-        - To run all tests that are under bvt folder.
-
-        `# glusto -c config.yml --pytest='-v -s bvt/'`
-
-        - To run a single test case
-
-        `# glusto -c config.yml --pytest='-v -s -k test_demo1'`
+        - To run a single test case:
+            *# glusto -c config.yml --pytest='-v -s -k test_demo1'*
 
     For more info about running these tests, refer the [docs](http://glusto.readthedocs.io/en/latest/userguide/glusto.html#options-for-running-unit-tests).
 
 
 Writing tests/libraries for GD2:
 --------------------------------
-- `tests` directory in glusto-tests contain testcases. Testcases are written as component wise.
+ - `tests` directory in glusto-tests contain testcases. Testcases are written as component wise.
 Testcases name and file name should should start with test_.
 
-- `glustolibs-gluster-gd2` directory in glusto-libs contains libraries for GD2 api's.
-Libraries for io's and miscelleneous are written on `glustolibs-io` and `glustolibs-misc`
-respectively. These functions or libraries can be used while writting testcases.
+ - `glustolibs-gluster-gd2` directory in glusto-libs contains libraries for GD2 api's.
+Libraries for io's and miscellaneous are written on `glustolibs-io` and `glustolibs-misc`
+respectively. These functions or libraries can be used while writing testcases.
 
-- While writting testscase or libraries follow
-        - Please follow the [PEP008 style guide](https://www.python.org/dev/peps/pep-0008/).
-        - Makes sure all the pylint and pyflakes error are fixed
-
+ - While writing testcases or libraries follow:
+ 
+	 - Please follow the [PEP008 style-guide](https://www.python.org/dev/peps/pep-0008/).
+	 - Makes sure all the pylint and pyflakes error are fixed
           For example:
 
               - C0326: Exactly one space required around assignment
-              - C0111: Missing module docstring (missing-docstring)
+              - C0111: Missing module doc-string (missing-doc string)
               - W: 50: Too long line
 
           For more information on [pylint](https://docs.pylint.org/en/1.6.0/tutorial.html) and on [pyflakes](http://flake8.pycqa.org/en/latest/user/error-codes.html)
-        - Optimize the code as much as possible. Eliminate the repeatative steps,
-          write it has separate function to avoid repeatation.
-        - Use proper python standards on returning values.
-          This style guide is a list of do's and don’ts for [Python programs](http://google.github.io/styleguide/pyguide.html).
-        - Add docstring to every function you write
+
+       
+
+	 - Optimize the code as much as possible. Eliminate the repetitive steps, write it has separate function.
+	- Use proper python standards on returning values.
+           This style guide is a list of do's and don’ts for [Python programs](http://google.github.io/styleguide/pyguide.html).
+
+	 - Add docstring to every function you write
 
           For example: This is an example of a module level function
 
@@ -141,9 +141,8 @@ respectively. These functions or libraries can be used while writting testcases.
                       The return value of the function.
                   """
 
-        - Make sure the log messages are grammatically correct and have no spelling mistakes.
-        - Comment every step of the test case/libraries, log the test step, test result, failure and success.
-
+	 - Make sure the log messages are grammatically correct and have no spelling mistakes. 
+	 - Comment every step of the test case/libraries, log the test step, test result, failure and success.
           For example:
 
               # peer status from mnode
@@ -151,9 +150,7 @@ respectively. These functions or libraries can be used while writting testcases.
               ret, out, err = peer_status(self.mnode)
               self.assertEqual(ret, 0, "Failed to get peer status from node %s: %s" % (self.mnode, err))
               g.log.info("Successfully got peer status from node %s:\n%s", self.mnode, out)
-
-        - Don't not use `print` statements in test-cases/libraries because prints statements are not captured in log files.
-          Use logger functions to dump messages into log file.
+	 - Don't not use `print` statements in test-cases/libraries because prints statements are not captured in log files.  Use logger functions to dump messages into log file.
 
 Logging:
 --------
