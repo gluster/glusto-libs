@@ -21,10 +21,17 @@
 
 import unittest
 from glusto.core import Glusto as g
+from glustolibs.gluster.exceptions import ConfigError, ExecutionError
+from glustolibs.gluster.peer_ops import is_peer_connected, peer_status
+from glustolibs.io.utils import log_mounts_info
 from glustolibs.gluster.lib_utils import (
     get_ip_from_hostname, configure_volumes,
     configure_mounts, inject_msg_in_gluster_logs,
     configure_logs, set_conf_entity)
+from glustolibs.gluster.volume_ops import set_volume_options
+from glustolibs.gluster.volume_libs import (setup_volume,
+                                            cleanup_volume,
+                                            log_volume_info_and_status)
 
 
 class runs_on(g.CarteTestClass):
@@ -65,6 +72,219 @@ class GlusterBaseClass(unittest.TestCase):
 
     volume_type = None
     mount_type = None
+
+    @classmethod
+    def validate_peers_are_connected(cls):
+        """Validate whether each server in the cluster is connected to
+        all other servers in cluster.
+        Returns (bool): True if all peers are in connected with other peers.
+            False otherwise.
+        """
+        # Validate if peer is connected from all the servers
+        g.log.info("Validating if servers %s are connected from other servers "
+                   "in the cluster", cls.servers)
+        for server in cls.servers:
+            g.log.info("Validate servers %s are in connected from  node %s",
+                       cls.servers, server)
+            ret = is_peer_connected(server, cls.servers)
+            if not ret:
+                g.log.error("Some or all servers %s are not in connected "
+                            "state from node %s", cls.servers, server)
+                return False
+            g.log.info("Successfully validated servers %s are all in "
+                       "connected state from node %s",
+                       cls.servers, server)
+        g.log.info("Successfully validated all servers %s are in connected "
+                   "state from other servers in the cluster", cls.servers)
+
+        # Peer Status from mnode
+        peer_status(cls.mnode)
+
+        return True
+
+    @classmethod
+    def setup_volume(cls, volume_create_force=False):
+        """Setup the volume:
+            - Create the volume, Start volume, Set volume
+            options, enable snapshot/quota/tier if specified in the config
+            file.
+            - Wait for volume processes to be online
+            - Export volume as NFS/SMB share if mount_type is NFS or SMB
+            - Log volume info and status
+        Args:
+            volume_create_force(bool): True if create_volume should be
+                executed with 'force' option.
+        Returns (bool): True if all the steps mentioned in the descriptions
+            passes. False otherwise.
+        """
+        force_volume_create = False
+        if cls.volume_create_force:
+            force_volume_create = True
+
+        # Validate peers before setting up volume
+        g.log.info("Validate peers before setting up volume ")
+        ret = cls.validate_peers_are_connected()
+        if not ret:
+            g.log.error("Failed to validate peers are in connected state "
+                        "before setting up volume")
+            return False
+        g.log.info("Successfully validated peers are in connected state "
+                   "before setting up volume")
+
+        # Setup Volume
+        g.log.info("Setting up volume %s", cls.volname)
+        ret = setup_volume(mnode=cls.mnode,
+                           all_servers_info=cls.all_servers_info,
+                           volume_config=cls.volume, force=force_volume_create)
+        if not ret:
+            g.log.error("Failed to Setup volume %s", cls.volname)
+            return False
+        g.log.info("Successful in setting up volume %s", cls.volname)
+
+        # ToDo : Wait for volume processes to be online
+
+        # Log Volume Info and Status
+        g.log.info("Log Volume %s Info and Status", cls.volname)
+        ret = log_volume_info_and_status(cls.mnode, cls.volname)
+        if not ret:
+            g.log.error("Logging volume %s info and status failed",
+                        cls.volname)
+            return False
+        g.log.info("Successful in logging volume %s info and status",
+                   cls.volname)
+
+        return True
+
+    @classmethod
+    def mount_volume(cls, mounts):
+        """Mount volume
+        Args:
+            mounts(list): List of mount_objs
+        Returns (bool): True if mounting the volume for a mount obj is
+            successful. False otherwise
+        """
+        g.log.info("Starting to mount volume %s", cls.volname)
+        for mount_obj in mounts:
+            g.log.info("Mounting volume '%s:%s' on '%s:%s'",
+                       mount_obj.server_system, mount_obj.volname,
+                       mount_obj.client_system, mount_obj.mountpoint)
+            ret = mount_obj.mount()
+            if not ret:
+                g.log.error("Failed to mount volume '%s:%s' on '%s:%s'",
+                            mount_obj.server_system, mount_obj.volname,
+                            mount_obj.client_system, mount_obj.mountpoint)
+                return False
+            else:
+                g.log.info("Successful in mounting volume '%s:%s' on "
+                           "'%s:%s'", mount_obj.server_system,
+                           mount_obj.volname, mount_obj.client_system,
+                           mount_obj.mountpoint)
+        g.log.info("Successful in mounting all mount objs for the volume %s",
+                   cls.volname)
+
+        # Get mounts info
+        g.log.info("Get mounts Info:")
+        log_mounts_info(mounts)
+
+        return True
+
+    @classmethod
+    def setup_volume_and_mount_volume(cls, mounts, volume_create_force=False):
+        """Setup the volume and mount the volume
+        Args:
+            mounts(list): List of mount_objs
+            volume_create_force(bool): True if create_volume should be
+                executed with 'force' option.
+        Returns (bool): True if setting up volume and mounting the volume
+            for a mount obj is successful. False otherwise
+        """
+        # Setup Volume
+        _rc = cls.setup_volume(volume_create_force)
+        if not _rc:
+            return _rc
+
+        # Mount Volume
+        _rc = cls.mount_volume(mounts)
+        if not _rc:
+            return _rc
+
+        return True
+
+    @classmethod
+    def unmount_volume(cls, mounts):
+        """Unmount all mounts for the volume
+        Args:
+            mounts(list): List of mount_objs
+        Returns (bool): True if unmounting the volume for a mount obj is
+            successful. False otherwise
+        """
+        # Unmount volume
+        g.log.info("Starting to UnMount Volume %s", cls.volname)
+        for mount_obj in mounts:
+            g.log.info("UnMounting volume '%s:%s' on '%s:%s'",
+                       mount_obj.server_system, mount_obj.volname,
+                       mount_obj.client_system, mount_obj.mountpoint)
+            ret = mount_obj.unmount()
+            if not ret:
+                g.log.error("Failed to unmount volume '%s:%s' on '%s:%s'",
+                            mount_obj.server_system, mount_obj.volname,
+                            mount_obj.client_system, mount_obj.mountpoint)
+
+                # Get mounts info
+                g.log.info("Get mounts Info:")
+                log_mounts_info(cls.mounts)
+
+                return False
+            else:
+                g.log.info("Successful in unmounting volume '%s:%s' on "
+                           "'%s:%s'", mount_obj.server_system,
+                           mount_obj.volname, mount_obj.client_system,
+                           mount_obj.mountpoint)
+        g.log.info("Successful in unmounting all mount objs for the volume %s",
+                   cls.volname)
+
+        # Get mounts info
+        g.log.info("Get mounts Info:")
+        log_mounts_info(mounts)
+
+        return True
+
+    @classmethod
+    def cleanup_volume(cls):
+        """Cleanup the volume
+        Returns (bool): True if cleanup volume is successful. False otherwise.
+        """
+        g.log.info("Cleanup Volume %s", cls.volname)
+        ret = cleanup_volume(mnode=cls.mnode, volname=cls.volname)
+        if not ret:
+            g.log.error("cleanup of volume %s failed", cls.volname)
+        else:
+            g.log.info("Successfully cleaned-up volume %s", cls.volname)
+
+        # Log Volume Info and Status
+        g.log.info("Log Volume %s Info and Status", cls.volname)
+        log_volume_info_and_status(cls.mnode, cls.volname)
+
+        return ret
+
+    @classmethod
+    def unmount_volume_and_cleanup_volume(cls, mounts):
+        """Unmount the volume and cleanup volume
+        Args:
+            mounts(list): List of mount_objs
+        Returns (bool): True if unmounting the volume for the mounts and
+            cleaning up volume is successful. False otherwise
+        """
+        # UnMount Volume
+        _rc = cls.unmount_volume(mounts)
+        if not _rc:
+            return _rc
+
+        # Setup Volume
+        _rc = cls.cleanup_volume()
+        if not _rc:
+            return _rc
+        return True
 
     @classmethod
     def setUpClass(cls):
